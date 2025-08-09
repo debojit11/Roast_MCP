@@ -1,3 +1,4 @@
+import asyncio
 import os
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -85,11 +86,13 @@ def roast(style: str, message: str) -> str:
         return f"Error: {str(e)}"
 
 if __name__ == "__main__":
-    # ✅ Use Railway's PORT if available, otherwise default to 8086
     port = int(os.getenv("PORT", 8086))
-    
-    mcp.run_async(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=port
-    )
+
+    async def main():
+        await mcp.run_async(
+            transport="streamable-http",
+            host="0.0.0.0",
+            port=port
+        )
+
+    asyncio.run(main())

@@ -8,10 +8,10 @@ from mcp.server.auth.provider import AccessToken
 
 load_dotenv()
 
-# Environment variables
+# Environment variables - renamed to match starter code
+TOKEN = os.getenv("AUTH_TOKEN")  # Changed from AUTH_TOKEN
+MY_NUMBER = os.getenv("MY_PHONE_NUMBER")  # Changed from MY_PHONE_NUMBER
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-MY_PHONE_NUMBER = os.getenv("MY_PHONE_NUMBER")  # Format: {country_code}{number}
-AUTH_TOKEN = os.getenv("AUTH_TOKEN")  # Your bearer token
 
 # Together API client
 client = Together(api_key=TOGETHER_API_KEY)
@@ -36,37 +36,39 @@ class SimpleBearerAuthProvider(BearerAuthProvider):
 mcp = FastMCP(
     "RoastMaster",
     "Savage & Sarcastic comeback generator",
-    auth=SimpleBearerAuthProvider(AUTH_TOKEN)
+    auth=SimpleBearerAuthProvider(TOKEN)  # Use TOKEN instead of AUTH_TOKEN
 )
 
+# Updated validate endpoint to match starter code
 @mcp.tool()
-async def validate(token: str) -> str:
-    """Required by Puch AI - validates token and returns phone number"""
-    if token == AUTH_TOKEN:
-        return MY_PHONE_NUMBER
-    raise ValueError("Invalid token")
+async def validate() -> str:  # Removed token parameter
+    """Required by Puch AI - returns phone number"""
+    return MY_NUMBER  # Direct return without validation
 
 @mcp.tool()
 async def roast(*, style: str, message: str) -> str:
     """
     Generate a savage or sarcastic comeback.
-    Parameters:
-    - style: 'savage' or 'sarcastic'
-    - message: The input to roast
+    style: 'savage' or 'sarcastic'
+    message: The input message to roast.
     """
     style = style.lower()
     if style not in ["savage", "sarcastic"]:
         return "Invalid style. Choose 'savage' or 'sarcastic'."
 
-    tone = (
-        "Respond with a brutally savage and unapologetically harsh comeback. Make it sting and cut deep. No niceties, no sugarcoating. Short, sharp, and savage." 
+    tone_instructions = (
+        "Respond with a brutally savage and unapologetically harsh comeback. "
+        "Make it sting and cut deep. No niceties, no sugarcoating. Short, sharp, and savage."
         if style == "savage" else
-        "Respond with a dry, ironic, and clever remark dripping with sarcasm. Make it playful but sharp, like a twitter burn."
+        "Respond with a dry, ironic, and clever remark dripping with sarcasm. "
+        "Make it playful but sharp, like a twitter burn."
     )
 
-    prompt = f"""Someone said: "{message}"
-    Your job: {tone}
-    Only reply with the comeback, no commentary."""
+    prompt = f"""
+    Someone said: "{message}"
+    Your job: {tone_instructions}
+    Only reply with the comeback, no extra commentary.
+    """
 
     try:
         response = client.chat.completions.create(
@@ -79,12 +81,12 @@ async def roast(*, style: str, message: str) -> str:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8086))
-    
+
     async def main():
         await mcp.run_async(
             transport="streamable-http",
             host="0.0.0.0",
             port=port
         )
-    
+
     asyncio.run(main())

@@ -80,7 +80,7 @@ async def roast(*, style: str, message: str) -> str:
         return f"Error: {str(e)}"
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8086))
+    port = int(os.getenv("PORT", 10000))
 
     async def main():
         await mcp.run_async(

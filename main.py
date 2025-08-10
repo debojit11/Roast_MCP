@@ -1,31 +1,25 @@
 import asyncio
 import os
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from together import Together
-from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
+from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 
 load_dotenv()
 
-# Initialize Together client with API key
-client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
-
 # Environment variables
 TOKEN = os.getenv("AUTH_TOKEN")
 MY_NUMBER = os.getenv("MY_PHONE_NUMBER")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
-# Generate RSA key pair for JWT verification
-key_pair = RSAKeyPair.generate()
+# Together API client
+client = Together(api_key=TOGETHER_API_KEY)
 
-class SimpleAuthProvider(JWTVerifier):
+class SimpleBearerAuthProvider(BearerAuthProvider):
     def __init__(self, token: str):
-        super().__init__(
-            public_key=key_pair.public_key,
-            issuer="roast-master",
-            audience="puch-ai"
-        )
+        k = RSAKeyPair.generate()
+        super().__init__(public_key=k.public_key, jwks_uri=None, issuer=None, audience=None)
         self.token = token
 
     async def load_access_token(self, token: str) -> AccessToken | None:
@@ -38,30 +32,25 @@ class SimpleAuthProvider(JWTVerifier):
             )
         return None
 
-# Create MCP app
+# MCP app
 mcp = FastMCP(
     "RoastMaster",
     "Savage & Sarcastic comeback generator",
-    auth=SimpleAuthProvider(TOKEN)
-)
-
-# Add CORS middleware directly to FastAPI app
-mcp.app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Mcp-Session-Id"]
+    auth=SimpleBearerAuthProvider(TOKEN)
 )
 
 @mcp.tool()
 async def validate() -> str:
-    """Required by Puch AI"""
-    return MY_NUMBER  # Must be in {country_code}{number} format
+    """Required by Puch AI - returns phone number"""
+    return MY_NUMBER  # Format: {country_code}{number}
 
 @mcp.tool()
 async def roast(style: str, message: str) -> str:
-    """Generate savage/sarcastic comebacks"""
+    """
+    Generate a savage or sarcastic comeback.
+    style: 'savage' or 'sarcastic'
+    message: The input to roast
+    """
     style = style.lower()
     if style not in ["savage", "sarcastic"]:
         return "Invalid style. Choose 'savage' or 'sarcastic'."
@@ -80,7 +69,7 @@ async def roast(style: str, message: str) -> str:
         return f"Error: {str(e)}"
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))  # Must use 10000 for Render
+    port = int(os.getenv("PORT", 10000))  # Use 10000 for Render
     
     async def main():
         await mcp.run_async(

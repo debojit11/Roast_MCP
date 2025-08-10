@@ -1,23 +1,31 @@
 import asyncio
 import os
-from fastapi.middleware.cors import CORSMiddleware  # Add this import
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from together import Together
-from fastmcp.server.auth.providers.jwt import JWTVerifier  # Updated import
+from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 
 load_dotenv()
 
 client = Together()
 
-TOKEN = os.getenv("AUTH_TOKEN")  # Make sure this matches .env
-MY_NUMBER = os.getenv("MY_PHONE_NUMBER")  # Format: 917636086117 (no +)
+# Environment variables
+TOKEN = os.getenv("AUTH_TOKEN")
+MY_NUMBER = os.getenv("MY_PHONE_NUMBER")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
-# Updated auth provider
+# Generate RSA key pair for JWT verification
+key_pair = RSAKeyPair.generate()
+
 class SimpleAuthProvider(JWTVerifier):
     def __init__(self, token: str):
-        super().__init__(issuer="roast-master")
+        super().__init__(
+            public_key=key_pair.public_key,
+            issuer="roast-master",
+            audience="puch-ai"
+        )
         self.token = token
 
     async def load_access_token(self, token: str) -> AccessToken | None:
@@ -30,6 +38,7 @@ class SimpleAuthProvider(JWTVerifier):
             )
         return None
 
+# MCP app
 mcp = FastMCP(
     "RoastMaster",
     "Savage & Sarcastic comeback generator",
@@ -49,33 +58,19 @@ async def setup_cors():
 
 @mcp.tool()
 async def validate() -> str:
-    """Must return only the phone number string"""
-    return MY_NUMBER  # Example: "917636086117"
+    """Required by Puch AI"""
+    return MY_NUMBER  # Must be in {country_code}{number} format
 
 @mcp.tool()
 async def roast(style: str, message: str) -> str:
-    """
-    Generate a savage or sarcastic comeback.
-    style: 'savage' or 'sarcastic'
-    message: The input message to roast.
-    """
+    """Generate savage/sarcastic comebacks"""
     style = style.lower()
     if style not in ["savage", "sarcastic"]:
         return "Invalid style. Choose 'savage' or 'sarcastic'."
 
-    tone_instructions = (
-        "Respond with a brutally savage and unapologetically harsh comeback. "
-        "Make it sting and cut deep. No niceties, no sugarcoating. Short, sharp, and savage."
-        if style == "savage" else
-        "Respond with a dry, ironic, and clever remark dripping with sarcasm. "
-        "Make it playful but sharp, like a twitter burn."
-    )
-
-    prompt = f"""
-    Someone said: "{message}"
-    Your job: {tone_instructions}
-    Only reply with the comeback, no extra commentary.
-    """
+    prompt = f"""Someone said: "{message}"
+    Your job: {"Respond with a brutally savage comeback" if style == "savage" else "Respond with sarcastic remark"}
+    Only reply with the comeback, no commentary."""
 
     try:
         response = client.chat.completions.create(
@@ -87,13 +82,13 @@ async def roast(style: str, message: str) -> str:
         return f"Error: {str(e)}"
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))
-
+    port = int(os.getenv("PORT", 10000))  # Must use 10000 for Render
+    
     async def main():
         await mcp.run_async(
             transport="streamable-http",
             host="0.0.0.0",
             port=port
         )
-
+    
     asyncio.run(main())

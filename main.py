@@ -9,12 +9,12 @@ from mcp.server.auth.provider import AccessToken
 
 load_dotenv()
 
-client = Together()
+# Initialize Together client with API key
+client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
 
 # Environment variables
 TOKEN = os.getenv("AUTH_TOKEN")
 MY_NUMBER = os.getenv("MY_PHONE_NUMBER")
-TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
 # Generate RSA key pair for JWT verification
 key_pair = RSAKeyPair.generate()
@@ -38,23 +38,21 @@ class SimpleAuthProvider(JWTVerifier):
             )
         return None
 
-# MCP app
+# Create MCP app
 mcp = FastMCP(
     "RoastMaster",
     "Savage & Sarcastic comeback generator",
     auth=SimpleAuthProvider(TOKEN)
 )
 
-# Add CORS middleware
-@mcp.on_startup
-async def setup_cors():
-    mcp.app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["Mcp-Session-Id"]
-    )
+# Add CORS middleware directly to FastAPI app
+mcp.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Mcp-Session-Id"]
+)
 
 @mcp.tool()
 async def validate() -> str:
